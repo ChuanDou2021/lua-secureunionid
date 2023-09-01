@@ -1,0 +1,26 @@
+CMAKE_MINIMUM_REQUIRED(VERSION 3.10)
+PROJECT(secureunionid C)
+
+SET(CMAKE_C_STANDARD 11)
+
+IF (WIN32)
+    MESSAGE(STATUS "Now is windows")
+ELSEIF (APPLE)
+    MESSAGE(STATUS "Now is Apple systens.")
+ELSEIF (UNIX)
+    MESSAGE(STATUS "Now is UNIX-like OS's.")
+ENDIF ()
+
+SET(SRC_DIR src)
+
+INCLUDE_DIRECTORIES(${SRC_DIR}/crypto)
+INCLUDE_DIRECTORIES(${SRC_DIR}/psi)
+INCLUDE_DIRECTORIES(${SRC_DIR})
+
+FILE(GLOB crypto_SRC ${SRC_DIR}/crypto/*.c )
+FILE(GLOB psi_SRC ${SRC_DIR}/psi/*.c )
+FILE(GLOB util_SRC ${SRC_DIR}/*.c )
+
+ADD_LIBRARY(secureunionid SHARED ${crypto_SRC} ${psi_SRC} ${util_SRC} )
+
+INSTALL(TARGETS secureunionid DESTINATION ${LUA_LIBDIR})
