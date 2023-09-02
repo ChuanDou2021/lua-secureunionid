@@ -74,6 +74,29 @@ local function test_key()
     assert(r ~= SUCCESS)
 end
 
+-- gen same systemkey from same masterkey
+local function test_key2()
+    local r = SUCCESS
+    local masterkey = "e019136679dbae3388e74787c74984f095d21ff56a17aa52391bebe79af72a6778fc2d31efde5d2bd044bee9aa8e3e25b4e26911ce1a8caabfb76d716576426e"
+    local dspid = "67d5d529-7303-4684-9a4e-99cf352bd092"
+
+    r = secureuid:gen_randseed()
+    r = secureuid:set_masterkey(masterkey)
+    r, key1 = secureuid:gen_key(dspid)
+    _, syskey1 = secureuid:gen_systemkey(key1.pubkey_g1, key1.pubkey_g2)
+
+    r = secureuid:gen_randseed()
+    r = secureuid:set_masterkey(masterkey)
+    r, key2 = secureuid:gen_key(dspid)
+    _, syskey2 = secureuid:gen_systemkey(key2.pubkey_g1, key2.pubkey_g2)
+
+    assert(key1.pubkey_g1, key2.pubkey_g1)
+    assert(key1.pubkey_g2, key2.pubkey_g2)
+    assert(key1.privatekey, key2.privatekey)
+    assert(syskey1.syskey_g1, syskey2.syskey_g1)
+    assert(syskey1.syskey_g2, syskey2.syskey_g2)
+end
+
 local function test_system_key()
     local dspid = "67d5d529-7303-4684-9a4e-99cf352bd092"
 
@@ -236,6 +259,7 @@ test_randseed()
 test_libsecureuid()
 test_masterkey()
 test_key()
+test_key2()
 test_system_key()
 test_blind()
 test_encrypt()
