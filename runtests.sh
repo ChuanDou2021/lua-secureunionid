@@ -18,7 +18,7 @@ eval "`luarocks path`"
 echo "===== Cleaning old build data ====="
 rm -f tests/libsecureunionid.*
 
-echo "===== Verifying cjson.so is not installed ====="
+echo "===== Verifying libsecureunionid.so is not installed ====="
 
 cd tests
 if lua -e 'require "libsecureunionid"' 2>/dev/null
