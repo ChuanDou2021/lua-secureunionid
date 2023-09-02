@@ -215,7 +215,7 @@ local function test_business1()
     -- 密钥分发
     --
 
-    -- baidu: 生成密钥
+    -- media: 生成密钥
     secureuid:gen_randseed()
     secureuid:gen_masterkey()
     local _, key = secureuid:gen_key(dspid)
@@ -226,27 +226,27 @@ local function test_business1()
     -- offline 数据对齐
     --
 
-    -- taobao: 盲化 did
+    -- dsp: 盲化 did
     secureuid:gen_randseed()
     local _, blind = secureuid:blind(did)
 
-    -- baidu: 加密盲化 did
+    -- media: 加密盲化 did
     local _, cipher = secureuid:encrypt(key.privatekey, blind.blind)
 
-    -- taobao: 去盲
+    -- dsp: 去盲
     local _, unblind_cipher = secureuid:unblind(syskey.syskey_g1, blind.beta, cipher)
 
     --
     -- online
     --
 
-    -- baidu: 产生加密的did
+    -- media: 产生加密的did
     secureuid:gen_randseed()
     local _, blind2 = secureuid:blind(did)
     local _, cipher2 = secureuid:encrypt(key.privatekey, blind2.blind)
     local _, unblind_cipher2 = secureuid:unblind(syskey.syskey_g1, blind2.beta, cipher2)
 
-    -- taobao: 查询数据库 <加密did -- did>
+    -- dsp: 查询数据库 <加密did -- did>
     assert(unblind_cipher == unblind_cipher2)
 
     assert(blind2.blind ~= blind.blind)
