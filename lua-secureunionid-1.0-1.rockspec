@@ -2,8 +2,8 @@ package = "lua-secureunionid"
 version = "1.0-1"
 rockspec_format = "3.0"
 source = {
-   url = "https://github.com/ChuanDou2021/lua-secureunionid",
-   tag = "v1.0",
+   url = "git://github.com/ChuanDou2021/lua-secureunionid",
+   tag = "v1.1",
 }
 description = {
    summary = "Secure ECC-based DID intersection",
