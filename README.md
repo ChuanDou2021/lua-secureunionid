@@ -1,2 +1,3 @@
 # lua-secureunionid
-Provide Secure ECC-based DID intersection for Lua
+
+Lua wrapper [SecureUnionID](https://github.com/volcengine/SecureUnionID)
