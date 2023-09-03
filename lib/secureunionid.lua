@@ -5,7 +5,7 @@
 --   1. c string 对外不可见
 --     1.1 出库的buf内容使用hex编码, 结果转换为lua string
 --     1.2 入库内容为lua string
--- 
+--
 -- NOTE:
 --   1. dspid, did均无长度限制, 一般选择用uuid
 
@@ -17,11 +17,11 @@ local ffi_new           = ffi.new
 local ffi_str           = ffi.string
 local ffi_copy          = ffi.copy
 local ffi_cdef          = ffi.cdef
-local char_arr_t        = ffi.typeof("char[?]") 
+local char_arr_t        = ffi.typeof("char[?]")
 local u_int8_arr_t      = ffi.typeof("uint8_t[?]")
 local char_arr2d1_t     = ffi.typeof("char *[1]")
-local char_arr2d2_t     = ffi.typeof("char *[2]")
-local str_fmt           = string.format
+-- local char_arr2d2_t     = ffi.typeof("char *[2]")
+-- local str_fmt           = string.format
 
 --
 -- load libsecureunionid lib
@@ -36,7 +36,7 @@ local function load_shared_lib(so_name)
     local io_close      = io.close
 
     local cpath = package.cpath
-    local tried_paths = {} 
+    local tried_paths = {}
     local i = 1
     for k, _ in string_gmatch(cpath, "[^;]+") do
         local fpath = string_match(k, "(.*/)")
@@ -69,13 +69,36 @@ ffi_cdef[[
     int genRandSeed(char *rnd);
     int MasterKeygen(unsigned long ran, char *masterkey);
     int genMasterKey(char *ran, char *masterkey);
-    int Keygen(char *masterkey, char *dspid, char *pkg1string, char *pkg2string, char *skstring);
-    int System_Keygen(char **pkig1string, char **pkig2string, int numofmedia, char *sysg1string, char *sysg2string);
-    int Blinding(char *did, unsigned long seed, char *betastring, char *Mstring);
-    int Blind(char *did, char *seed, char *betastring, char *Mstring);
+    int Keygen(char *masterkey,
+               char *dspid,
+               char *pkg1string,
+               char *pkg2string,
+               char *skstring);
+    int System_Keygen(char **pkig1string,
+                      char **pkig2string,
+                      int numofmedia,
+                      char *sysg1string,
+                      char *sysg2string);
+    int Blinding(char *did,
+                 unsigned long seed,
+                 char *betastring,
+                 char *Mstring);
+    int Blind(char *did,
+              char *seed,
+              char *betastring,
+              char *Mstring);
     int Enc(char *skstring, char *Mstring, char *btistring);
-    int Unblinding(char **btistring, int numofmedia, char *betastring, char *sysg1string,  char *btstring);
-    int verify_individual(char **btistring, char **pkig1string, char **pkig2string, char *did, int numofmedia, char *betastring);
+    int Unblinding(char **btistring,
+                   int numofmedia,
+                   char *betastring,
+                   char *sysg1string,
+                   char *btstring);
+    int verify_individual(char **btistring,
+                          char **pkig1string,
+                          char **pkig2string,
+                          char *did,
+                          int numofmedia,
+                          char *betastring);
     int batch_verify(char **btstring, char **did, char *sysg2string, int numofdid);
 
     u_char * hex_dump(u_char *dst, u_char *src, int len);
@@ -203,17 +226,17 @@ end
 
 --
 -- set master key buf
--- hex: lua string, encode in hex string
+-- key: lua string, encode in hex string
 -- return: SUCCESS or FAIL
 --
-function _M.set_masterkey(self, hex)
-    if hex == nil or #hex / 2 ~= MASTER_KEY_LEN then
+function _M.set_masterkey(self, key)
+    if key == nil or #key / 2 ~= MASTER_KEY_LEN then
         return FAIL, "illegal master key"
     end
 
-    hex_cstr = to_cstr(hex)
+    local key_cstr = to_cstr(key)
     local masterkey = self._buf_masterkey
-    return mylib.hex2bytes(masterkey, hex_cstr)
+    return mylib.hex2bytes(masterkey, key_cstr)
 end
 
 --
@@ -264,7 +287,7 @@ end
 --
 -- generate system key
 --
-function _M.gen_systemkey(self, pubkey_g1, pubkey_g2)
+function _M.gen_systemkey(_, pubkey_g1, pubkey_g2)
     if pubkey_g1 == nil or #pubkey_g1 ~= PUBKEY_G1_LEN * 2 then
         return FAIL, "illegal pubkey g1"
     end
@@ -329,7 +352,7 @@ end
 --
 -- encrypt
 --
-function _M.encrypt(self, privatekey, blind)
+function _M.encrypt(_, privatekey, blind)
     local _, privatekey_cstr = hex2cstr(privatekey)
     local _, blind_cstr = hex2cstr(blind)
     local cipher_cstr = ffi_new(char_arr_t, PUBKEY_G1_LEN)
@@ -349,7 +372,7 @@ end
 --
 -- unblind
 --
-function _M.unblind(self, syskey_g1, beta, cipher)
+function _M.unblind(_, syskey_g1, beta, cipher)
     local _, syskey_g1_cstr = hex2cstr(syskey_g1)
     local _, beta_cstr = hex2cstr(beta)
     local _, cipher_cstr = hex2cstr(cipher)
@@ -369,7 +392,7 @@ end
 --
 -- batch verify
 --
-function _M.verify(self, pubkey_g1, pubkey_g2, did, beta, cipher)
+function _M.verify(_, pubkey_g1, pubkey_g2, did, beta, cipher)
     local _, pubkey_g1_cstr = hex2cstr(pubkey_g1)
     local pubkey_g1_ary = ffi_new(char_arr2d1_t, pubkey_g1_cstr)
     local _, pubkey_g2_cstr = hex2cstr(pubkey_g2)
