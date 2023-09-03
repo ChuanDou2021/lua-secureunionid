@@ -35,6 +35,7 @@ echo "===== Testing LuaRocks build ====="
 luarocks make --local --no-install
 
 echo "===== Testing Makefile build ====="
-cp -r lib/secureunionid.lua build.luarocks/libsecureunionid.* tests
+cp -r lib/secureunionid.lua libsecureunionid.* tests
 do_tests
-rm tests/secureunionid.lua tests/libsecureunionid.*
+rm tests/secureunionid.lua \
+  tests/libsecureunionid.*

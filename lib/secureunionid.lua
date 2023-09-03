@@ -28,9 +28,6 @@ local str_fmt           = string.format
 -- ref: lua-resty-radixtree/lib/resty/radixtree.lua
 --
 local lib_name = "libsecureunionid.so"
-if ffi.os == "OSX" then
-    lib_name = "libsecureunionid.dylib"
-end
 
 local function load_shared_lib(so_name)
     local string_gmatch = string.gmatch

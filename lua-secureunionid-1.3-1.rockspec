@@ -1,9 +1,9 @@
-package = "lua-secureunionid"
-version = "1.0-1"
 rockspec_format = "3.0"
+package = "lua-secureunionid"
+version = "1.3-1"
 source = {
    url = "git://github.com/ChuanDou2021/lua-secureunionid",
-   tag = "v1.2",
+   tag = "v1.3"
 }
 description = {
    summary = "Secure ECC-based DID intersection",
@@ -16,13 +16,13 @@ description = {
 }
 build = {
    type = "builtin",
-   install = {
-      lua = {
-         ["secureunionid"] = "lib/secureunionid.lua"
-      }
-   },
    modules = {
       libsecureunionid = {
+         incdirs = {
+            "src/crypto",
+            "src/psi",
+            "src/"
+         },
          sources = {
             "src/crypto/big_256_56.c",
             "src/crypto/ecp2_BN254.c",
@@ -43,16 +43,16 @@ build = {
             "src/crypto/rom_order_BN254.c",
             "src/psi/encryption.c",
             "src/utils.c"
-         },
-         incdirs = {
-            "src/crypto",
-            "src/psi",
-            "src/"
          }
-      },
+      }
+   },
+   install = {
+      lua = {
+         secureunionid = "lib/secureunionid.lua"
+      }
    }
 }
 test = {
    type = "command",
-   command = "bash runtests.sh",
+   command = "bash runtests.sh"
 }
