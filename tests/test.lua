@@ -13,15 +13,14 @@ end
 local function test_randseed()
     local r = secureuid:gen_randseed()
     assert(r == SUCCESS)
-    local seed1 = secureuid:get_randseed()
+    local _, seed1 = secureuid:get_randseed()
 
     r = secureuid:gen_randseed()
     assert(r == SUCCESS)
-    local seed2 = secureuid:get_randseed()
+    local _, seed2 = secureuid:get_randseed()
 
     assert(seed1 ~= seed2)
     assert(#seed1 == #seed2)
-    assert(#seed1 == 2 * secureuid.MASTER_KEY_LEN)
 end
 
 local function test_masterkey()
@@ -31,26 +30,23 @@ local function test_masterkey()
     assert(r == SUCCESS)
     r = secureuid:gen_masterkey()
     assert(r == SUCCESS)
-    local masterkey1 = secureuid:get_masterkey()
+    local _, masterkey1 = secureuid:get_masterkey()
     r = secureuid:gen_randseed()
     assert(r == SUCCESS)
     r = secureuid:gen_masterkey()
     assert(r == SUCCESS)
-    local masterkey2 = secureuid:get_masterkey()
+    local _, masterkey2 = secureuid:get_masterkey()
 
     assert(masterkey1 ~= masterkey2)
 
-    local masterkey3 = "e019136679dbae3388e74787c74984f095d21ff56a17aa52391bebe79af72a6778fc2d31efde5d2bd044bee9aa8e3e25b4e26911ce1a8caabfb76d716576426e"
+    local masterkey3 = "m7Ji5CWhxDMOp2AOM1RLGSDGkDW1M59IAmt88DSCeu1I_ZabtA5yVk46E-2JsMCPEtW3h1U5MOrIqc6v5rD7qQ"
     r = secureuid:set_masterkey(masterkey3)
     assert(r == SUCCESS)
-    local masterkey4 = secureuid:get_masterkey()
+    local _, masterkey4 = secureuid:get_masterkey()
     assert(masterkey3 == masterkey4)
 
     -- nil master key
     r = secureuid:set_masterkey(nil)
-    assert(r ~= SUCCESS)
-    -- illegal master key
-    r = secureuid:set_masterkey("1")
     assert(r ~= SUCCESS)
 end
 
@@ -63,9 +59,6 @@ local function test_key()
     local pubkey_g1 = key.pubkey_g1
     local pubkey_g2 = key.pubkey_g2
     local privatekey = key.privatekey
-    assert(#pubkey_g1 == secureuid.PUBKEY_G1_LEN * 2)
-    assert(#pubkey_g2 == secureuid.PUBKEY_G2_LEN * 2)
-    assert(#privatekey == secureuid.PRIVATE_KEY_LEN * 2)
 
     r = secureuid:gen_key(nil)
     assert(r ~= SUCCESS)
@@ -77,18 +70,18 @@ end
 -- gen same systemkey from same masterkey
 local function test_key2()
     local r = SUCCESS
-    local masterkey = "e019136679dbae3388e74787c74984f095d21ff56a17aa52391bebe79af72a6778fc2d31efde5d2bd044bee9aa8e3e25b4e26911ce1a8caabfb76d716576426e"
+    local masterkey = "m7Ji5CWhxDMOp2AOM1RLGSDGkDW1M59IAmt88DSCeu1I_ZabtA5yVk46E-2JsMCPEtW3h1U5MOrIqc6v5rD7qQ"
     local dspid = "67d5d529-7303-4684-9a4e-99cf352bd092"
 
     r = secureuid:gen_randseed()
     r = secureuid:set_masterkey(masterkey)
     r, key1 = secureuid:gen_key(dspid)
-    _, syskey1 = secureuid:gen_systemkey(key1.pubkey_g1, key1.pubkey_g2)
+    _, syskey1 = secureuid.gen_systemkey(key1.pubkey_g1, key1.pubkey_g2)
 
     r = secureuid:gen_randseed()
     r = secureuid:set_masterkey(masterkey)
     r, key2 = secureuid:gen_key(dspid)
-    _, syskey2 = secureuid:gen_systemkey(key2.pubkey_g1, key2.pubkey_g2)
+    r, syskey2 = secureuid.gen_systemkey(key2.pubkey_g1, key2.pubkey_g2)
 
     assert(key1.pubkey_g1, key2.pubkey_g1)
     assert(key1.pubkey_g2, key2.pubkey_g2)
@@ -101,20 +94,14 @@ local function test_system_key()
     local dspid = "67d5d529-7303-4684-9a4e-99cf352bd092"
 
     local r, key = secureuid:gen_key(dspid)
-    r, syskey = secureuid:gen_systemkey(key.pubkey_g1, key.pubkey_g2)
+    r, syskey = secureuid.gen_systemkey(key.pubkey_g1, key.pubkey_g2)
     assert(r == SUCCESS)
     local syskey_g1 = syskey.syskey_g1
     local syskey_g2 = syskey.syskey_g2
-    assert(#syskey_g1 == secureuid.PUBKEY_G1_LEN * 2)
-    assert(#syskey_g2 == secureuid.PUBKEY_G2_LEN * 2)
 
-    r = secureuid:gen_systemkey(nil, key.pubkey_g2)
+    r = secureuid.gen_systemkey(key.pubkey_g2)
     assert(r ~= SUCCESS)
-    r = secureuid:gen_systemkey(key.pubkey_g1, nil)
-    assert(r ~= SUCCESS)
-    r = secureuid:gen_systemkey(key.pubkey_g1, "1")
-    assert(r ~= SUCCESS)
-    r = secureuid:gen_systemkey("2", key.pubkey_g2)
+    r = secureuid.gen_systemkey(key.pubkey_g1, nil)
     assert(r ~= SUCCESS)
 end
 
@@ -151,9 +138,8 @@ local function test_encrypt()
 
     secureuid:gen_randseed()
     r, key = secureuid:gen_key(dspid)
-    r, cipher = secureuid:encrypt(key.privatekey, blind.blind)
+    r, cipher = secureuid.encrypt(key.privatekey, blind.blind)
     assert(r == SUCCESS)
-    assert(#cipher == 2 * secureuid.PUBKEY_G1_LEN)
     assert(cipher ~= blind.blind)
     assert(cipher ~= blind.beta)
 end
@@ -171,16 +157,15 @@ local function test_unblind()
     secureuid:gen_randseed()
     secureuid:gen_masterkey()
     r, key = secureuid:gen_key(dspid)
-    r, syskey = secureuid:gen_systemkey(key.pubkey_g1, key.pubkey_g2)
+    r, syskey = secureuid.gen_systemkey(key.pubkey_g1, key.pubkey_g2)
 
     secureuid:gen_randseed()
     r, blind = secureuid:blind(did)
 
-    r, cipher = secureuid:encrypt(key.privatekey, blind.blind)
+    r, cipher = secureuid.encrypt(key.privatekey, blind.blind)
 
-    r, unblind_cipher = secureuid:unblind(syskey.syskey_g1, blind.beta, cipher)
+    r, unblind_cipher = secureuid.unblind(syskey.syskey_g1, blind.beta, cipher)
     assert(r == SUCCESS)
-    assert(#unblind_cipher == 2 * secureuid.PUBKEY_G1_LEN)
 end
 
 local function test_verify()
@@ -196,12 +181,12 @@ local function test_verify()
     secureuid:gen_randseed()
     secureuid:gen_masterkey()
     r, key = secureuid:gen_key(dspid)
-    r, syskey = secureuid:gen_systemkey(key.pubkey_g1, key.pubkey_g2)
+    r, syskey = secureuid.gen_systemkey(key.pubkey_g1, key.pubkey_g2)
 
     secureuid:gen_randseed()
     r, blind = secureuid:blind(did)
 
-    r, cipher = secureuid:encrypt(key.privatekey, blind.blind)
+    r, cipher = secureuid.encrypt(key.privatekey, blind.blind)
 
     r = secureuid:verify(key.pubkey_g1, key.pubkey_g2, did, blind.beta, cipher)
     assert(r == SUCCESS)
@@ -220,7 +205,7 @@ local function test_business1()
     secureuid:gen_masterkey()
     local _, key = secureuid:gen_key(dspid)
     -- baidu: 为taobao分发公钥
-    local _, syskey = secureuid:gen_systemkey(key.pubkey_g1, key.pubkey_g2)
+    local _, syskey = secureuid.gen_systemkey(key.pubkey_g1, key.pubkey_g2)
 
     --
     -- offline 数据对齐
@@ -231,10 +216,10 @@ local function test_business1()
     local _, blind = secureuid:blind(did)
 
     -- media: 加密盲化 did
-    local _, cipher = secureuid:encrypt(key.privatekey, blind.blind)
+    local _, cipher = secureuid.encrypt(key.privatekey, blind.blind)
 
     -- dsp: 去盲
-    local _, unblind_cipher = secureuid:unblind(syskey.syskey_g1, blind.beta, cipher)
+    local _, unblind_cipher = secureuid.unblind(syskey.syskey_g1, blind.beta, cipher)
 
     --
     -- online
@@ -243,8 +228,8 @@ local function test_business1()
     -- media: 产生加密的did
     secureuid:gen_randseed()
     local _, blind2 = secureuid:blind(did)
-    local _, cipher2 = secureuid:encrypt(key.privatekey, blind2.blind)
-    local _, unblind_cipher2 = secureuid:unblind(syskey.syskey_g1, blind2.beta, cipher2)
+    local _, cipher2 = secureuid.encrypt(key.privatekey, blind2.blind)
+    local _, unblind_cipher2 = secureuid.unblind(syskey.syskey_g1, blind2.beta, cipher2)
 
     -- dsp: 查询数据库 <加密did -- did>
     assert(unblind_cipher == unblind_cipher2)

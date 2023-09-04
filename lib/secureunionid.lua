@@ -3,7 +3,7 @@
 --
 -- 原则:
 --   1. c string 对外不可见
---     1.1 出库的buf内容使用hex编码, 结果转换为lua string
+--     1.1 出库的buf内容使用base64编码, 结果转换为lua string
 --     1.2 入库内容为lua string
 --
 -- NOTE:
@@ -101,8 +101,8 @@ ffi_cdef[[
                           char *betastring);
     int batch_verify(char **btstring, char **did, char *sysg2string, int numofdid);
 
-    u_char * hex_dump(u_char *dst, u_char *src, int len);
-    int hex2bytes(u_char *dst, u_char *src);
+    int encode_base64url(u_char *dst, u_char *src, int len);
+    int decode_base64url(u_char *dst, u_char *src, int len);
 ]]
 
 --
@@ -114,47 +114,16 @@ local function to_cstr(s)
     return buf
 end
 
+local function base64_encoded_length(len)
+    return math.floor(((len + 2) / 3) * 4)
+end
+
+local function base64_decoded_length(len)
+    return math.floor(((len + 3) / 4) * 3)
+end
+
 local BUF_MAX_LEN           = 1024
-local buf_hex               = ffi_new(u_int8_arr_t, BUF_MAX_LEN)
-
---
--- convert c string to hex
--- and return the result in lua string
---
--- src      : pointer to c string
--- src_len  : integer
---
-local function hex(src, src_len)
-    if src == nil or src_len <= 0 then
-        return nil, "src is nil or len <= 0"
-    end
-
-    -- prepare dst buf
-    -- if src len small, just use self.buf_hex,
-    -- malloc new dst buf for big src length
-    local dst_len = src_len * 2
-    local dst
-    if dst_len <= BUF_MAX_LEN then
-        dst = buf_hex
-    else
-        dst = ffi_new(u_int8_arr_t, dst_len)
-    end
-
-    if dst == nil then
-        return nil, "dst buf not avaliable"
-    end
-
-    mylib.hex_dump(dst, src, src_len)
-
-    return ffi_str(dst, dst_len)
-end
-
-local function hex2cstr(s)
-    local s_cstr = to_cstr(s)
-    local buf = ffi_new(char_arr_t, #s / 2)
-    local r = mylib.hex2bytes(buf, s_cstr)
-    return r, buf
-end
+local buf_base64            = ffi_new(u_int8_arr_t, BUF_MAX_LEN)
 
 --
 -- common const
@@ -169,6 +138,61 @@ local SUCCESS               = 0
 local FAIL                  = -1
 local C_NULL_POINTER_ERROR  = -3
 local C_MALLOC_ERROR        = -4
+
+--
+-- convert c string to base64
+-- and return the result in lua string
+--
+-- src      : pointer to c string
+-- src_len  : integer
+--
+local function encode_base64(src, src_len)
+    if src == nil or src_len <= 0 then
+        return FAIL, "src is nil or len <= 0"
+    end
+
+    -- prepare dst buf
+    -- if src len small, just use self.buf_base64,
+    -- malloc new dst buf for big src length
+    local dst_len = base64_encoded_length(src_len)
+    local dst
+    if dst_len <= BUF_MAX_LEN then
+        dst = buf_base64
+    else
+        dst = ffi_new(u_int8_arr_t, dst_len)
+    end
+
+    if dst == nil then
+        return nil, "dst buf not avaliable"
+    end
+
+    -- return len
+    dst_len = mylib.encode_base64url(dst, src, src_len)
+    return SUCCESS, ffi_str(dst, dst_len)
+end
+
+local function decode_base64(dst_result, s)
+    local src_len = #s
+
+    local dst_len = base64_decoded_length(src_len)
+    local dst
+    if dst_len <= BUF_MAX_LEN then
+        dst = buf_base64
+    else
+        dst = ffi_new(u_int8_arr_t, dst_len)
+    end
+
+    local len = mylib.decode_base64url(dst, to_cstr(s), src_len)
+    if len > 0 then
+        if dst_result == nil then
+            dst_result = ffi_new(u_int8_arr_t, len)
+        end
+        ffi_copy(dst_result, dst, len)
+        return SUCCESS, dst_result
+    end
+
+    return FAIL, "decode base64 error"
+end
 
 local _M = {
     _VERSION                = '0.1',
@@ -213,30 +237,34 @@ end
 
 function _M.get_randseed(self)
     local randseed = self._buf_randseed
-    return hex(randseed, MASTER_KEY_LEN)
+    return encode_base64(randseed, MASTER_KEY_LEN)
 end
 
 --
--- get master key, the result encode in hex lua string
+-- get master key, the result encode in base64 lua string
 --
 function _M.get_masterkey(self)
     local masterkey = self._buf_masterkey
-    return hex(masterkey, MASTER_KEY_LEN)
+    return encode_base64(masterkey, MASTER_KEY_LEN)
 end
 
 --
 -- set master key buf
--- key: lua string, encode in hex string
+-- key: lua string, encode in base64 string
 -- return: SUCCESS or FAIL
 --
 function _M.set_masterkey(self, key)
-    if key == nil or #key / 2 ~= MASTER_KEY_LEN then
+    if key == nil then
         return FAIL, "illegal master key"
     end
 
-    local key_cstr = to_cstr(key)
-    local masterkey = self._buf_masterkey
-    return mylib.hex2bytes(masterkey, key_cstr)
+    local dst = self._buf_masterkey
+    local r, err = decode_base64(dst, key)
+    if r ~= SUCCESS then
+        return FAIL, err
+    else
+        return SUCCESS
+    end
 end
 
 --
@@ -265,17 +293,20 @@ function _M.gen_key(self, dspid)
     end
 
     local masterkey = self._buf_masterkey
-    local pubkey_g1 = ffi_new(char_arr_t, PUBKEY_G1_LEN)
-    local pubkey_g2 = ffi_new(char_arr_t, PUBKEY_G2_LEN)
-    local privatekey = ffi_new(char_arr_t, PRIVATE_KEY_LEN)
+    local pubkey_g1_cstr = ffi_new(char_arr_t, PUBKEY_G1_LEN)
+    local pubkey_g2_cstr = ffi_new(char_arr_t, PUBKEY_G2_LEN)
+    local privatekey_cstr = ffi_new(char_arr_t, PRIVATE_KEY_LEN)
     local dspid_cstr = to_cstr(dspid)
 
-    local r = mylib.Keygen(masterkey, dspid_cstr, pubkey_g1, pubkey_g2, privatekey)
+    local r = mylib.Keygen(masterkey, dspid_cstr, pubkey_g1_cstr, pubkey_g2_cstr, privatekey_cstr)
     if r == 2 then
+        local _, pubkey_g1 = encode_base64(pubkey_g1_cstr, PUBKEY_G1_LEN)
+        local _, pubkey_g2 = encode_base64(pubkey_g2_cstr, PUBKEY_G2_LEN)
+        local _, privatekey = encode_base64(privatekey_cstr, PRIVATE_KEY_LEN)
         local key = {
-            pubkey_g1 = hex(pubkey_g1, PUBKEY_G1_LEN),
-            pubkey_g2 = hex(pubkey_g2, PUBKEY_G2_LEN),
-            privatekey = hex(privatekey, PRIVATE_KEY_LEN)
+            pubkey_g1 = pubkey_g1,
+            pubkey_g2 = pubkey_g2,
+            privatekey = privatekey
         }
         return SUCCESS, key
     elseif r == 0 then
@@ -287,27 +318,25 @@ end
 --
 -- generate system key
 --
-function _M.gen_systemkey(_, pubkey_g1, pubkey_g2)
-    if pubkey_g1 == nil or #pubkey_g1 ~= PUBKEY_G1_LEN * 2 then
-        return FAIL, "illegal pubkey g1"
+function _M.gen_systemkey(pubkey_g1, pubkey_g2)
+    if pubkey_g1 == nil or pubkey_g2 == nil then
+        return FAIL, "illegal pubkey_g1 or pubkey_g2"
     end
 
-    if pubkey_g2 == nil or #pubkey_g2 ~= PUBKEY_G2_LEN * 2 then
-        return FAIL, "illegal pubkey g2"
-    end
-
-    local _, pubkey_g1_cstr = hex2cstr(pubkey_g1)
-    local _, pubkey_g2_cstr = hex2cstr(pubkey_g2)
+    local _, pubkey_g1_cstr = decode_base64(nil, pubkey_g1)
+    local _, pubkey_g2_cstr = decode_base64(nil, pubkey_g2)
     local pubkey_g1_ary = ffi_new(char_arr2d1_t, pubkey_g1_cstr)
     local pubkey_g2_ary = ffi_new(char_arr2d1_t, pubkey_g2_cstr)
-    local syskey_g1 = ffi_new(char_arr_t, PUBKEY_G1_LEN)
-    local syskey_g2 = ffi_new(char_arr_t, PUBKEY_G2_LEN)
+    local syskey_g1_cstr = ffi_new(char_arr_t, PUBKEY_G1_LEN)
+    local syskey_g2_cstr = ffi_new(char_arr_t, PUBKEY_G2_LEN)
 
-    local r = mylib.System_Keygen(pubkey_g1_ary, pubkey_g2_ary, 1, syskey_g1, syskey_g2)
+    local r = mylib.System_Keygen(pubkey_g1_ary, pubkey_g2_ary, 1, syskey_g1_cstr, syskey_g2_cstr)
     if r == 2 then
+        local _, syskey_g1 = encode_base64(syskey_g1_cstr, PUBKEY_G1_LEN)
+        local _, syskey_g2 = encode_base64(syskey_g2_cstr, PUBKEY_G2_LEN)
         local key = {
-            syskey_g1 = hex(syskey_g1, PUBKEY_G1_LEN),
-            syskey_g2 = hex(syskey_g2, PUBKEY_G2_LEN)
+            syskey_g1 = syskey_g1,
+            syskey_g2 = syskey_g2
         }
         return SUCCESS, key
     elseif r == 3 then
@@ -336,11 +365,9 @@ function _M.blind(self, did)
 
     local r = mylib.Blind(did_cstr, randseed, beta_cstr, blind_cstr)
     if r == 2 then
-        local blind = {
-            beta = hex(beta_cstr, 2 * PRIVATE_KEY_LEN + 1),
-            blind = hex(blind_cstr, PUBKEY_G1_LEN)
-        }
-        return SUCCESS, blind
+        local _, beta = encode_base64(beta_cstr, 2 * PRIVATE_KEY_LEN + 1)
+        local _, blind = encode_base64(blind_cstr, PUBKEY_G1_LEN)
+        return SUCCESS, { beta = beta, blind = blind }
     elseif r == 3 then
         return FAIL, "unkown"
     elseif r == 0 then
@@ -352,13 +379,13 @@ end
 --
 -- encrypt
 --
-function _M.encrypt(_, privatekey, blind)
-    local _, privatekey_cstr = hex2cstr(privatekey)
-    local _, blind_cstr = hex2cstr(blind)
+function _M.encrypt(privatekey, blind)
+    local _, privatekey_cstr = decode_base64(nil, privatekey)
+    local _, blind_cstr = decode_base64(nil, blind)
     local cipher_cstr = ffi_new(char_arr_t, PUBKEY_G1_LEN)
     local r = mylib.Enc(privatekey_cstr, blind_cstr, cipher_cstr)
     if r == 2 then
-        return SUCCESS, hex(cipher_cstr, PUBKEY_G1_LEN)
+        return encode_base64(cipher_cstr, PUBKEY_G1_LEN)
     elseif r == 3 then
         return FAIL
     elseif r == 0 then
@@ -372,15 +399,15 @@ end
 --
 -- unblind
 --
-function _M.unblind(_, syskey_g1, beta, cipher)
-    local _, syskey_g1_cstr = hex2cstr(syskey_g1)
-    local _, beta_cstr = hex2cstr(beta)
-    local _, cipher_cstr = hex2cstr(cipher)
+function _M.unblind(syskey_g1, beta, cipher)
+    local _, syskey_g1_cstr = decode_base64(nil, syskey_g1)
+    local _, beta_cstr = decode_base64(nil, beta)
+    local _, cipher_cstr = decode_base64(nil, cipher)
     local cipher_ary = ffi_new(char_arr2d1_t, cipher_cstr)
     local unblind_cstr = ffi_new(char_arr_t, PUBKEY_G1_LEN)
     local r = mylib.Unblinding(cipher_ary, 1, beta_cstr, syskey_g1_cstr, unblind_cstr)
     if r == 2 then
-        return SUCCESS, hex(unblind_cstr, PUBKEY_G1_LEN)
+        return encode_base64(unblind_cstr, PUBKEY_G1_LEN)
     elseif r == 3 then
         return FAIL, "unkown"
     elseif r == 0 then
@@ -393,13 +420,13 @@ end
 -- batch verify
 --
 function _M.verify(_, pubkey_g1, pubkey_g2, did, beta, cipher)
-    local _, pubkey_g1_cstr = hex2cstr(pubkey_g1)
+    local _, pubkey_g1_cstr = decode_base64(nil, pubkey_g1)
     local pubkey_g1_ary = ffi_new(char_arr2d1_t, pubkey_g1_cstr)
-    local _, pubkey_g2_cstr = hex2cstr(pubkey_g2)
+    local _, pubkey_g2_cstr = decode_base64(nil, pubkey_g2)
     local pubkey_g2_ary = ffi_new(char_arr2d1_t, pubkey_g2_cstr)
     local did_cstr = to_cstr(did)
-    local _, beta_cstr = hex2cstr(beta)
-    local _, cipher_cstr = hex2cstr(cipher)
+    local _, beta_cstr = decode_base64(nil, beta)
+    local _, cipher_cstr = decode_base64(nil, cipher)
     local cipher_ary = ffi_new(char_arr2d1_t, cipher_cstr)
 
     local r = mylib.verify_individual(cipher_ary, pubkey_g1_ary, pubkey_g2_ary, did_cstr, 1, beta_cstr)
