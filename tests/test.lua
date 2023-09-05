@@ -204,7 +204,7 @@ local function test_business1()
     secureuid:gen_randseed()
     secureuid:gen_masterkey()
     local _, key = secureuid:gen_key(dspid)
-    -- baidu: 为taobao分发公钥
+    -- media: 为dsp分发公钥
     local _, syskey = secureuid.gen_systemkey(key.pubkey_g1, key.pubkey_g2)
 
     --
