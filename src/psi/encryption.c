@@ -490,6 +490,7 @@ int verify_individual(char **btistring, char **pkig1string, char **pkig2string, 
         return MALLOCERROR;
     }
     if((pki = (ECC_PK *)malloc(sizeof(ECC_PK)*numofmedia)) == NULL){
+        free(bti);
         return MALLOCERROR;
     }
 
@@ -545,6 +546,7 @@ int batch_verify(char **btstring, char **did, char *sysg2string, int numofdid)
         return MALLOCERROR;
     }
     if((bt = (ECP_BN254 *)malloc(sizeof(ECP_BN254)*numofdid)) == NULL){
+        free(hashdid);
         return MALLOCERROR;
     }
 

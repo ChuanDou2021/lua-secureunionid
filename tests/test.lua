@@ -21,6 +21,11 @@ local function test_randseed()
 
     assert(seed1 ~= seed2)
     assert(#seed1 == #seed2)
+
+    local r, _ = secureuid:set_randseed(seed1)
+    assert(r == SUCCESS)
+    local _, seed1_1 = secureuid:get_randseed()
+    assert(seed1 == seed1_1)
 end
 
 local function test_masterkey()
@@ -144,6 +149,39 @@ local function test_encrypt()
     assert(cipher ~= blind.beta)
 end
 
+local function test_encrypt2()
+    local dspid = "a49fec12-3d31-4603-9d6b-4c94ab72000e"
+    local dids = {
+        "0000-0000-0000-0000",
+        "1111-1111-1111-1111",
+        "2222-2222-2222-2222"
+    }
+    local cipher = nil
+    local key = nil
+    local blind = nil
+
+    secureuid:gen_randseed()
+    local r, key = secureuid:gen_key(dspid)
+    assert(r == SUCCESS)
+
+    local i = 100
+    while i > 0 do
+        local r, syskey = secureuid.gen_systemkey(key.pubkey_g1, key.pubkey_g2)
+        assert(r == SUCCESS)
+        secureuid:gen_randseed()
+        for _, did in ipairs(dids) do
+            local r, blind = secureuid:blind(did)
+            assert(r == SUCCESS)
+            local r, cipher = secureuid.encrypt(key.privatekey, blind.blind)
+            assert(r == SUCCESS)
+            local r, cipher = secureuid.unblind(syskey.syskey_g1, blind.beta, cipher)
+            assert(r == SUCCESS)
+        end
+
+        i = i - 1
+    end
+end
+
 local function test_unblind()
     local dspid = "a49fec12-3d31-4603-9d6b-4c94ab72000e"
     local did = "a49fec12-3d31-4603-9d6b-4c94ab72000f"
@@ -248,6 +286,7 @@ test_key2()
 test_system_key()
 test_blind()
 test_encrypt()
+test_encrypt2()
 test_unblind()
 test_verify()
 test_business1()

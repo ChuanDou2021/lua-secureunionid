@@ -122,8 +122,8 @@ local function base64_decoded_length(len)
     return math.floor(((len + 3) / 4) * 3)
 end
 
-local BUF_MAX_LEN           = 1024
-local buf_base64            = ffi_new(u_int8_arr_t, BUF_MAX_LEN)
+local BUF_MAX_LEN   = 1024
+local buf_base64    = ffi_new(u_int8_arr_t, BUF_MAX_LEN)
 
 --
 -- common const
@@ -139,6 +139,21 @@ local FAIL                  = -1
 local C_NULL_POINTER_ERROR  = -3
 local C_MALLOC_ERROR        = -4
 
+local function my_malloc(len)
+    if len == nil or len <= 0 then
+        return FAIL, "len is nil or <= 0"
+    end
+
+    local dst
+    if len <= BUF_MAX_LEN then
+        dst = buf_base64
+    else
+        dst = ffi_new(u_int8_arr_t, len)
+    end
+
+    return SUCCESS, dst
+end
+
 --
 -- convert c string to base64
 -- and return the result in lua string
@@ -151,19 +166,10 @@ local function encode_base64(src, src_len)
         return FAIL, "src is nil or len <= 0"
     end
 
-    -- prepare dst buf
-    -- if src len small, just use self.buf_base64,
-    -- malloc new dst buf for big src length
     local dst_len = base64_encoded_length(src_len)
-    local dst
-    if dst_len <= BUF_MAX_LEN then
-        dst = buf_base64
-    else
-        dst = ffi_new(u_int8_arr_t, dst_len)
-    end
-
-    if dst == nil then
-        return nil, "dst buf not avaliable"
+    local r, dst = my_malloc(dst_len)
+    if r ~= SUCCESS then
+        return FAIL, "dst buf not avaliable"
     end
 
     -- return len
@@ -175,11 +181,9 @@ local function decode_base64(dst_result, s)
     local src_len = #s
 
     local dst_len = base64_decoded_length(src_len)
-    local dst
-    if dst_len <= BUF_MAX_LEN then
-        dst = buf_base64
-    else
-        dst = ffi_new(u_int8_arr_t, dst_len)
+    local r, dst = my_malloc(dst_len)
+    if r ~= SUCCESS then
+        return FAIL, "dst buf not avaliable"
     end
 
     local len = mylib.decode_base64url(dst, to_cstr(s), src_len)
@@ -238,6 +242,25 @@ end
 function _M.get_randseed(self)
     local randseed = self._buf_randseed
     return encode_base64(randseed, MASTER_KEY_LEN)
+end
+
+--
+-- set randseed buf
+-- key: lua string, encode in base64 string
+-- return: SUCCESS or FAIL
+--
+function _M.set_randseed(self, seed)
+    if seed == nil or #seed == 0 then
+        return FAIL, "illegal rand seed"
+    end
+
+    local dst = self._buf_randseed
+    local r, err = decode_base64(dst, seed)
+    if r ~= SUCCESS then
+        return FAIL, err
+    else
+        return SUCCESS
+    end
 end
 
 --

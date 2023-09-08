@@ -703,8 +703,8 @@ void FP12_BN254_pow4(FP12_BN254 *p, FP12_BN254 *q, BIG_256_56 u[4]) {
     int i, j, k, nb, pb, bt;
     FP12_BN254 g[8], r;
     BIG_256_56 t[4], mt;
-    sign8 w[NLEN_256_56 * BASEBITS_256_56 + 1];
-    sign8 s[NLEN_256_56 * BASEBITS_256_56 + 1];
+    sign8 w[NLEN_256_56 * BASEBITS_256_56 + 1] = {0};
+    sign8 s[NLEN_256_56 * BASEBITS_256_56 + 1] = {0};
 
     for (i = 0; i < 4; i++)
         BIG_256_56_copy(t[i], u[i]);
