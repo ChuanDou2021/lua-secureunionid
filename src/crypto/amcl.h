@@ -141,9 +141,9 @@ typedef struct {
 
 typedef struct {
     unsign32 ira[NK]; /**< random number array   */
-    int rndptr;  /**< pointer into array */
+    unsign32 rndptr;  /**< pointer into array */
     unsign32 borrow;  /**<  borrow as a result of subtraction */
-    int pool_ptr;     /**< pointer into random pool */
+    unsign32 pool_ptr;     /**< pointer into random pool */
     char pool[32];    /**< random pool */
 } csprng;
 

@@ -200,13 +200,21 @@ int genRandSeed(char *rnd) {
         return 0;
     }
     int ret = 0;
+    int n = 0;
     while(ret < 60) {
-        ret += read(fd, rnd + ret, 4);
+        n = read(fd, rnd + ret, 4);
+        if (n > 0) {
+            ret += n;
+        }
     }
     while(ret < 64) {
-        ret += read(fd, rnd + ret, (64 - ret));
+        n = read(fd, rnd + ret, (64 - ret));
+        if (n > 0) {
+            ret += n;
+        }
     }
     close(fd);
+
     return ret;
 }
 

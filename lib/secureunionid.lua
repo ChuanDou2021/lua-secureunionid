@@ -235,6 +235,8 @@ function _M.gen_randseed(self)
         return SUCCESS
     elseif r == 0 then
         return C_NULL_POINTER_ERROR, "c null pointer error"
+    elseif r == 3 then
+        return FAIL, "gen rand seed error"
     end
     return r
 end

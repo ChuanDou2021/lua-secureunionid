@@ -113,7 +113,7 @@ void RAND_clean(csprng *rng) {
 /* SU= 8 */
 int RAND_byte(csprng *rng) {
     int r;
-    r = rng->pool[rng->pool_ptr++];
+    r = rng->pool[rng->pool_ptr++ % 32];
     if (rng->pool_ptr >= 32) fill_pool(rng);
     return (r & 0xff);
 }
